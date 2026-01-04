@@ -1,0 +1,31 @@
+
+# Dataset Exploration Findings
+## Papluca Language Identification Dataset
+Date: 2026-01-05
+
+## Basic Information
+- Total training samples: 70000
+- Total test samples: 10000
+- Number of languages: 20
+
+## Language Distribution
+- Average samples per language: 3500.0
+- Most samples: Language ar (3500)
+- Fewest samples: Language ar (3500)
+- Imbalance ratio: 1.00x
+
+## Text Characteristics
+- Average words per text: 19.7
+- Average characters per text: 110.9
+- Shortest text: 1 words
+- Longest text: 420 words
+
+## Data Quality
+- Missing texts: 0
+- Missing labels: 0
+- Duplicate texts: 1022
+
+## Implications for Model Design
+1. Need to handle class imbalance
+2. Text length varies significantly
+3. Consider truncation around 41 words (90th percentile)
