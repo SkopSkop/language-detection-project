@@ -1,0 +1,24 @@
+{
+  "model_name": "papluca/xlm-roberta-base-language-detection",
+  "timestamp": "2026-01-05T14:57:11.625309",
+  "performance": {
+    "accuracy": 0.996,
+    "average_confidence": 0.9928191149711609,
+    "total_predictions": 10000
+  },
+  "comparison": {
+    "baseline_accuracy": 0.9069,
+    "improvement": 0.08909999999999996,
+    "improvement_percentage": 0.09824677472709224
+  },
+  "configuration": {
+    "batch_size": 32,
+    "max_length": 512,
+    "device": "cpu"
+  },
+  "insights": {
+    "most_confident_predictions": 0.9958059906959533,
+    "least_confident_predictions": 0.9924051821231842,
+    "mapping_strategy": "numeric"
+  }
+}

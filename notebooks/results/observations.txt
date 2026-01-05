@@ -1,0 +1,18 @@
+
+## Key Insights: Transformers vs Baseline
+
+### Performance Comparison:
+- **Baseline (TF-IDF + LR)**: 90.69% accuracy
+- **XLM-RoBERTa (Pre-trained)**: 99.60% accuracy
+- **Improvement**: +8.91%
+
+### Transformer Characteristics:
+- Average prediction confidence: 99.28%
+- Processes 10000 samples in ~312 batches
+- Max sequence length: 512 tokens
+
+### Key Findings:
+1. Transformers achieve higher accuracy
+2. Prediction confidence varies widely (26.41% to 99.66%)
+3. Some languages consistently confused across both models
+
