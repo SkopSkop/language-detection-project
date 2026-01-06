@@ -1,0 +1,15 @@
+# Core ML / DL
+torch
+transformers>=4.57.0
+datasets
+
+# Data handling
+numpy
+pandas
+
+# Classical ML (baseline)
+scikit-learn
+joblib
+
+# Utilities
+tqdm
