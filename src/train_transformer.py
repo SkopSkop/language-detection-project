@@ -410,7 +410,7 @@ def sanity_check_pretrained_model(model_name):
 
 
 def main():
-   
+    print("DEBUG: main() version = 2024-EXPERIMENT-FIX")
     results = {}
     # 1. Load and prepare data
  
@@ -425,7 +425,7 @@ def main():
 
   
     # 2. Load label encoder
-
+    print("\n=== LOADING LABEL ENCODER ===")
     label_encoder = None
     num_labels = None
 
