@@ -506,12 +506,20 @@ def main():
     if RUN_PRETRAINED_EVALUATION:
         print("\n=== EXPERIMENT 1: PRETRAINED TRANSFORMER (EVALUATION) ===")
 
-        if pretrained_model is None:
-            print("Loading pretrained fine-tuned model from disk...")
-            pretrained_model = AutoModelForSequenceClassification.from_pretrained(
-                MODEL_DIR / "transformer_finetuned"
-            )
+        model_path = MODEL_DIR / "transformer_finetuned"
 
+        if pretrained_model is None:
+            if model_path.exists():
+                print("Loading pretrained fine-tuned model from disk...")
+                pretrained_model = AutoModelForSequenceClassification.from_pretrained(
+                    model_path,
+                    local_files_only=True
+                )
+            else:
+                print("Fine-tuned model not found. Using base pretrained model.")
+                pretrained_model = AutoModelForSequenceClassification.from_pretrained(
+                    TRANSFORMER_MODEL_NAME
+                )
         pretrained_results = evaluate_transformer(
             X_test,
             y_test,
@@ -523,7 +531,6 @@ def main():
 
     if pretrained_results is not None:
         results["pretrained"] = pretrained_results
-
 
     # 8. Transformer from scratch
 
@@ -549,11 +556,22 @@ def main():
     if RUN_SCRATCH_EVALUATION:
         print("\n=== EXPERIMENT 2: TRANSFORMER FROM SCRATCH (EVALUATION) ===")
 
+        model_path = MODEL_DIR / "transformer_scratch"
+
         if scratch_model is None:
-            print("Loading scratch-trained model from disk...")
-            scratch_model = AutoModelForSequenceClassification.from_pretrained(
-                MODEL_DIR / "transformer_scratch"
-            )
+            if model_path.exists():
+                print("Loading scratch-trained model from disk...")
+                scratch_model = AutoModelForSequenceClassification.from_pretrained(
+                    model_path,
+                    local_files_only=True
+                )
+            else:
+                print("Scratch-trained model not found. Using untrained model.")
+                config = AutoConfig.from_pretrained(
+                    TRANSFORMER_MODEL_NAME,
+                   num_labels=num_labels
+                )
+                scratch_model = AutoModelForSequenceClassification.from_config(config)
 
         scratch_results = evaluate_transformer(
             X_test,
@@ -566,6 +584,7 @@ def main():
 
     if scratch_results is not None:
         results["scratch"] = scratch_results
+
 
 
     # 9. Short vs long text analysis
