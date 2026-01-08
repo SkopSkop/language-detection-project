@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import torch
+from pathlib import Path
 
 # Hugging Face Transformers
 from transformers import (
@@ -20,9 +21,35 @@ from transformers import (
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix , f1_score
 import joblib
 
-TRANSFORMER_MODEL_NAME = "papluca/xlm-roberta-base-language-detection"
 
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
+
+
+# RUN CONFIGURATION
+
+RUN_BASELINE = True
+
+RUN_SANITY_CHECK = True
+
+RUN_PRETRAINED_TRAINING = False
+RUN_PRETRAINED_EVALUATION = True
+
+RUN_SCRATCH_TRAINING = False
+RUN_SCRATCH_EVALUATION = True
+
+RUN_SHORT_LONG_ANALYSIS = True
+
+
+SUBSET_SIZE = 5000          
+MAX_LENGTH = 64
+PRETRAINED_EPOCHS = 2
+SCRATCH_EPOCHS = 1
+
+TRANSFORMER_MODEL_NAME = "papluca/xlm-roberta-base-language-detection"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+MODEL_DIR = PROJECT_ROOT / "models"
+DATA_DIR = PROJECT_ROOT / "data"
+
 
 class TextClassificationDataset(Dataset):
     def __init__(self, encodings, labels):
@@ -89,9 +116,9 @@ def prepare_splits(train_df, test_df):
 def evaluate_baseline(X_train, X_test, y_train, y_test):
     print("=== BASELINE MODEL EVALUATION ===")
 
-    model = joblib.load("notebooks/models/baseline_tfidf_lr.pkl")
-    tfidf = joblib.load("notebooks/models/tfidf_vectorizer.pkl")
-    label_encoder = joblib.load("notebooks/models/label_encoder.pkl")
+    model = joblib.load(MODEL_DIR / "baseline_tfidf_lr.pkl")
+    tfidf = joblib.load(MODEL_DIR / "tfidf_vectorizer.pkl")
+    label_encoder = joblib.load(MODEL_DIR / "label_encoder.pkl")
 
     # Encode labels (strings -> ints)
     y_train_enc = label_encoder.transform(y_train)
@@ -155,7 +182,7 @@ def load_transformer_model(model_name):
 
     return tokenizer, model
 
-def evaluate_transformer(X_test, y_test, tokenizer, model, label_encoder, batch_size=32):
+def evaluate_transformer(X_test, y_test, tokenizer, model,batch_size=32):
     print("=== TRANSFORMER MODEL EVALUATION ===")
 
     print("Creating inference pipeline...")
@@ -312,104 +339,253 @@ def train_transformer_model(
     )
 
     trainer.train()
+
+    print(f"saving trained model to {output_dir}...")
+    trainer.save_model(output_dir)
+    tokenizer.save_pretrained(output_dir)
+
     return trainer
+
+def split_by_text_length(X, y, short_max=50, long_min=150):
+    lengths = X.str.len()
+
+    short_mask = lengths <= short_max
+    long_mask = lengths >= long_min
+
+    X_short = X[short_mask]
+    y_short = y[short_mask]
+
+    X_long = X[long_mask]
+    y_long = y[long_mask]
+
+    return (X_short, y_short), (X_long, y_long)
+
+def evaluate_on_subset(name, X_subset, y_subset, tokenizer, model):
+    print(f"\n--- {name} ---")
+    print(f"Samples: {len(X_subset):,}")
+
+    results = evaluate_transformer(
+        X_subset,
+        y_subset,
+        tokenizer,
+        model
+    )
+
+    return results
+
+def sanity_check_pretrained_model(model_name):
+    print("\n=== SANITY CHECK: CLEAN PRETRAINED MODEL ===")
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForSequenceClassification.from_pretrained(model_name)
+    model.eval()
+
+    classifier = pipeline(
+        "text-classification",
+        model=model,
+        tokenizer=tokenizer,
+        device=-1,
+        truncation=True,
+        padding=True,
+        max_length=64
+    )
+
+    samples = [
+        ("en", "Hello, how are you doing today?"),
+        ("fr", "Bonjour, comment allez-vous aujourd'hui?"),
+        ("es", "Hola, ¿cómo estás hoy?"),
+        ("de", "Hallo, wie geht es dir heute?"),
+    ]
+
 
 
 def main():
-    # ---- Load and prepare data ----
+   
+    results = {}
+    # 1. Load and prepare data
+ 
     train_df, test_df = load_or_download_data()
     X_train, X_test, y_train, y_test = prepare_splits(train_df, test_df)
 
-    SUBSET_SIZE = 5000
+    if SUBSET_SIZE is not None:
+        X_train = X_train.sample(n=SUBSET_SIZE, random_state=42)
+        y_train = y_train.loc[X_train.index]
 
-    X_train = X_train.sample(n=SUBSET_SIZE, random_state=42)
-    y_train = y_train.loc[X_train.index]
+    print(f"Training samples used: {len(X_train):,}")
 
-    # ---- Load label encoder ----
-    label_encoder = joblib.load("notebooks/models/label_encoder.pkl")
+  
+    # 2. Load label encoder
+
+    label_encoder = joblib.load(MODEL_DIR / "label_encoder.pkl")
     num_labels = len(label_encoder.classes_)
 
-    # ---- Baseline evaluation ----
-    baseline_accuracy, _, _ = evaluate_baseline(
-        X_train, X_test, y_train, y_test
-    )
+    pretrained_model = None
+    scratch_model = None
 
-    # ---- Shared tokenizer ----
+
+
+    # 3. Baseline evaluation
+   
+    if RUN_BASELINE:
+        baseline_accuracy, _, _ = evaluate_baseline(
+            X_train, X_test, y_train, y_test
+        )
+    else:
+        baseline_accuracy = None
+
+
+    # 4. Sanity check (clean pretrained model)
+
+    if RUN_SANITY_CHECK:
+        sanity_check_pretrained_model(TRANSFORMER_MODEL_NAME)
+
+    # 5. Shared tokenizer
+
     tokenizer = AutoTokenizer.from_pretrained(TRANSFORMER_MODEL_NAME)
 
-    # ---- Prepare tokenized datasets ----
+
+    # 6. Tokenized datasets (for training)
+
     train_dataset = tokenize_dataset(
-        X_train, y_train, tokenizer, label_encoder, max_length=64
+        X_train, y_train, tokenizer, label_encoder, max_length=MAX_LENGTH
     )
     test_dataset = tokenize_dataset(
-        X_test, y_test, tokenizer, label_encoder, max_length=64
+        X_test, y_test, tokenizer, label_encoder, max_length=MAX_LENGTH
     )
 
-    # ================================
-    # Experiment 1: Pretrained model
-    # ================================
-    print("\n=== EXPERIMENT 1: PRETRAINED TRANSFORMER ===")
+    pretrained_model = None
+    scratch_model = None
 
-    pretrained_model = create_transformer_model(
-        TRANSFORMER_MODEL_NAME,
-        num_labels,
-        label_encoder,
-        pretrained=True
-    )
 
-    train_transformer_model(
-        pretrained_model,
-        tokenizer,
-        train_dataset,
-        test_dataset,
-        output_dir="models/transformer_finetuned",
-        epochs=2
-    )
+    # 7. Pretrained transformer
 
-    pretrained_results = evaluate_transformer(
-        X_test,
-        y_test,
-        tokenizer,
-        pretrained_model,
-        label_encoder
-    )
+    if RUN_PRETRAINED_TRAINING:
+        print("\n=== EXPERIMENT 1: PRETRAINED TRANSFORMER (TRAINING) ===")
 
-    # ================================
-    # Experiment 2: Training from scratch
-    # ================================
-    print("\n=== EXPERIMENT 2: TRANSFORMER FROM SCRATCH ===")
+        pretrained_model = create_transformer_model(
+            TRANSFORMER_MODEL_NAME,
+            num_labels,
+            label_encoder,
+            pretrained=True
+        )
 
-    scratch_model = create_transformer_model(
-        TRANSFORMER_MODEL_NAME,
-        num_labels,
-        label_encoder,
-        pretrained=False
-    )
+        train_transformer_model(
+            pretrained_model,
+            tokenizer,
+            train_dataset,
+            test_dataset,
+            output_dir=MODEL_DIR / "transformer_finetuned",
+            epochs=PRETRAINED_EPOCHS
+        )
 
-    train_transformer_model(
-        scratch_model,
-        tokenizer,
-        train_dataset,
-        test_dataset,
-        output_dir="models/transformer_scratch",
-        epochs=1
-    )
+    if RUN_PRETRAINED_EVALUATION:
+        print("\n=== EXPERIMENT 1: PRETRAINED TRANSFORMER (EVALUATION) ===")
 
-    scratch_results = evaluate_transformer(
-        X_test,
-        y_test,
-        tokenizer,
-        scratch_model,
-        label_encoder
-    )
+        if pretrained_model is None:
+            print("Loading pretrained fine-tuned model from disk...")
+            pretrained_model = AutoModelForSequenceClassification.from_pretrained(
+                MODEL_DIR / "transformer_finetuned"
+            )
 
-    # ================================
-    # Final comparison
-    # ================================
+        pretrained_results = evaluate_transformer(
+            X_test,
+            y_test,
+            tokenizer,
+            pretrained_model
+        )
+    else:
+        pretrained_results = None
+
+    if pretrained_results is not None:
+        results["pretrained"] = pretrained_results
+
+
+    # 8. Transformer from scratch
+
+    if RUN_SCRATCH_TRAINING:
+        print("\n=== EXPERIMENT 2: TRANSFORMER FROM SCRATCH (TRAINING) ===")
+
+        scratch_model = create_transformer_model(
+            TRANSFORMER_MODEL_NAME,
+            num_labels,
+            label_encoder,
+            pretrained=False
+        )
+
+        train_transformer_model(
+            scratch_model,
+            tokenizer,
+            train_dataset,
+            test_dataset,
+            output_dir=MODEL_DIR / "transformer_scratch",
+            epochs=SCRATCH_EPOCHS
+        )
+
+    if RUN_SCRATCH_EVALUATION:
+        print("\n=== EXPERIMENT 2: TRANSFORMER FROM SCRATCH (EVALUATION) ===")
+
+        if scratch_model is None:
+            print("Loading scratch-trained model from disk...")
+            scratch_model = AutoModelForSequenceClassification.from_pretrained(
+                MODEL_DIR / "transformer_scratch"
+            )
+
+        scratch_results = evaluate_transformer(
+            X_test,
+            y_test,
+            tokenizer,
+            scratch_model
+        )
+    else:
+        scratch_results = None
+
+    if scratch_results is not None:
+        results["scratch"] = scratch_results
+
+
+    # 9. Short vs long text analysis
+
+    if RUN_SHORT_LONG_ANALYSIS and pretrained_results is not None:
+        print("\n=== SHORT vs LONG TEXT ANALYSIS (PRETRAINED) ===")
+
+        (X_short, y_short), (X_long, y_long) = split_by_text_length(
+            X_test, y_test
+        )
+
+        print("\n[Short texts]")
+        short_results = evaluate_transformer(
+            X_short,
+            y_short,
+            tokenizer,
+            pretrained_model
+        )
+
+        print("\n[Long texts]")
+        long_results = evaluate_transformer(
+            X_long,
+            y_long,
+            tokenizer,
+            pretrained_model
+        )
+
+        results["short_long"] = {
+            "short": short_results,
+            "long": long_results
+        }
+    # 10. Final comparison
+
     print("\n=== FINAL MODEL COMPARISON ===")
-    print(f"Baseline accuracy:           {baseline_accuracy:.2%}")
-    print(f"Pretrained transformer:      {pretrained_results['accuracy']:.2%}")
-    print(f"Transformer (from scratch):  {scratch_results['accuracy']:.2%}")
+
+    if baseline_accuracy is not None:
+        print(f"Baseline accuracy:           {baseline_accuracy:.2%}")
+
+    if pretrained_results is not None:
+        print(f"Pretrained transformer:      {pretrained_results['accuracy']:.2%}")
+
+    if scratch_results is not None:
+        print(f"Transformer (from scratch):  {scratch_results['accuracy']:.2%}")
+
+    return results
 
 
 if __name__ == "__main__":
