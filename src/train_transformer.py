@@ -507,12 +507,13 @@ def main():
         print("\n=== EXPERIMENT 1: PRETRAINED TRANSFORMER (EVALUATION) ===")
 
         model_path = MODEL_DIR / "transformer_finetuned"
+        config_file = model_path / "config.json"
 
         if pretrained_model is None:
-            if model_path.exists():
+            if config_file.exists():
                 print("Loading pretrained fine-tuned model from disk...")
                 pretrained_model = AutoModelForSequenceClassification.from_pretrained(
-                    model_path,
+                    str(model_path),
                     local_files_only=True
                 )
             else:
@@ -557,12 +558,13 @@ def main():
         print("\n=== EXPERIMENT 2: TRANSFORMER FROM SCRATCH (EVALUATION) ===")
 
         model_path = MODEL_DIR / "transformer_scratch"
+        config_file = model_path / "config.json"
 
         if scratch_model is None:
-            if model_path.exists():
+            if config_file.exists():
                 print("Loading scratch-trained model from disk...")
                 scratch_model = AutoModelForSequenceClassification.from_pretrained(
-                    model_path,
+                    str(model_path),
                     local_files_only=True
                 )
             else:
