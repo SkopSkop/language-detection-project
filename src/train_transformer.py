@@ -116,6 +116,16 @@ def prepare_splits(train_df, test_df):
 def evaluate_baseline(X_train, X_test, y_train, y_test):
     print("=== BASELINE MODEL EVALUATION ===")
 
+    required_files = [
+        MODEL_DIR / "baseline_tfidf_lr.pkl",
+        MODEL_DIR / "tfidf_vectorizer.pkl",
+        MODEL_DIR / "label_encoder.pkl",
+    ]
+
+    if not all(p.exists() for p in required_files):
+        print("Baseline artifacts not found. Skipping baseline evaluation.")
+        return None, None, None
+
     model = joblib.load(MODEL_DIR / "baseline_tfidf_lr.pkl")
     tfidf = joblib.load(MODEL_DIR / "tfidf_vectorizer.pkl")
     label_encoder = joblib.load(MODEL_DIR / "label_encoder.pkl")
