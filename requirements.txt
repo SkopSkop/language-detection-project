@@ -1,6 +1,6 @@
 # Core ML / DL
 torch
-transformers==4.40.2
+transformers>=4.41,<5.0
 datasets
 
 # Data handling
@@ -13,3 +13,4 @@ joblib
 
 # Utilities
 tqdm
+tokenizers>=0.19,<0.22
