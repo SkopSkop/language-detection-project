@@ -1,5 +1,6 @@
 # Large model artifacts
-models/**
+models/transformer_finetuned/**
+models/transformer_scratch/**
 
 
 # Byte-compiled / optimized / DLL files
