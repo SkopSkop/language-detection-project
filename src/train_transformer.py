@@ -426,15 +426,17 @@ def main():
   
     # 2. Load label encoder
 
-    label_encoder_path = MODEL_DIR / "label_encoder.pkl"
+    label_encoder = None
+    num_labels = None
 
-    if label_encoder_path.exists():
-        label_encoder = joblib.load(label_encoder_path)
-        num_labels = len(label_encoder.classes_)
-    else:
-        print("Label encoder not found. Baseline and training will be skipped.")
-        label_encoder = None
-        num_labels = None
+    if RUN_BASELINE or RUN_PRETRAINED_TRAINING or RUN_SCRATCH_TRAINING:
+        label_encoder_path = MODEL_DIR / "label_encoder.pkl"
+
+        if label_encoder_path.exists():
+            label_encoder = joblib.load(label_encoder_path)
+            num_labels = len(label_encoder.classes_)
+        else:
+            print("Label encoder not found. Skipping baseline/training.")
 
 
     pretrained_model = None
