@@ -1,6 +1,6 @@
 # Core ML / DL
 torch
-transformers>=4.57.0
+transformers==4.40.2
 datasets
 
 # Data handling
