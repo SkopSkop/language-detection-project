@@ -416,8 +416,16 @@ def main():
   
     # 2. Load label encoder
 
-    label_encoder = joblib.load(MODEL_DIR / "label_encoder.pkl")
-    num_labels = len(label_encoder.classes_)
+    label_encoder_path = MODEL_DIR / "label_encoder.pkl"
+
+    if label_encoder_path.exists():
+        label_encoder = joblib.load(label_encoder_path)
+        num_labels = len(label_encoder.classes_)
+    else:
+        print("Label encoder not found. Baseline and training will be skipped.")
+        label_encoder = None
+        num_labels = None
+
 
     pretrained_model = None
     scratch_model = None
@@ -426,8 +434,8 @@ def main():
 
     # 3. Baseline evaluation
    
-    if RUN_BASELINE:
-        baseline_accuracy, _, _ = evaluate_baseline(
+    if RUN_BASELINE and label_encoder is not None:
+     baseline_accuracy, _, _ = evaluate_baseline(
             X_train, X_test, y_train, y_test
         )
     else:
@@ -446,12 +454,17 @@ def main():
 
     # 6. Tokenized datasets (for training)
 
-    train_dataset = tokenize_dataset(
-        X_train, y_train, tokenizer, label_encoder, max_length=MAX_LENGTH
-    )
-    test_dataset = tokenize_dataset(
-        X_test, y_test, tokenizer, label_encoder, max_length=MAX_LENGTH
-    )
+    if label_encoder is not None:
+        train_dataset = tokenize_dataset(
+         X_train, y_train, tokenizer, label_encoder, max_length=MAX_LENGTH
+        )
+        test_dataset = tokenize_dataset(
+            X_test, y_test, tokenizer, label_encoder, max_length=MAX_LENGTH
+        )
+    else:
+        train_dataset = None
+        test_dataset = None
+    
 
     pretrained_model = None
     scratch_model = None
@@ -459,7 +472,7 @@ def main():
 
     # 7. Pretrained transformer
 
-    if RUN_PRETRAINED_TRAINING:
+    if RUN_PRETRAINED_TRAINING and label_encoder is not None:
         print("\n=== EXPERIMENT 1: PRETRAINED TRANSFORMER (TRAINING) ===")
 
         pretrained_model = create_transformer_model(
@@ -502,7 +515,7 @@ def main():
 
     # 8. Transformer from scratch
 
-    if RUN_SCRATCH_TRAINING:
+    if RUN_SCRATCH_TRAINING and label_encoder is not None:
         print("\n=== EXPERIMENT 2: TRANSFORMER FROM SCRATCH (TRAINING) ===")
 
         scratch_model = create_transformer_model(
